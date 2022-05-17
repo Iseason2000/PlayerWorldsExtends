@@ -1,0 +1,16 @@
+name: PWPDifficulty
+version: '${version}'
+main: top.iseason.bukkit.pwpdifficulty.PWPDifficulty
+prefix: PWPDifficulty
+depend: [ PlayerWorldsPro ]
+authors: [ Iseason ]
+description: 快速改变世界难度
+commands:
+  pwpdifficulty:
+    aliases:
+      - 'pwpd'
+    usage: "/pwpd setall <difficulty>  设置所有家园的世界难度"
+  entitySelector:
+    aliases:
+      - 'es'
+    usage: "/es black/withe 开启实体选择模式，再次输入关闭"

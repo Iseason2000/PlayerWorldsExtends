@@ -1,0 +1,9 @@
+# pwpdifficulty reload 或者 pwpd reload重载配置
+# 需要op或者pwpdifficulty.admin 权限
+
+#允许自然生成怪物
+global-blacklist:
+
+
+#允许自然生成动物
+natural-whitelist:

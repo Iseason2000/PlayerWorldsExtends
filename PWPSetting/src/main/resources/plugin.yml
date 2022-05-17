@@ -1,0 +1,11 @@
+name: PWPSetting
+version: '${version}'
+main: top.iseason.bukkit.pwpsetting.PWPSetting
+prefix: PWPSetting
+depend: [ PlayerWorldsPro ]
+authors: [ Iseason ]
+description: 家园非成员权限设置
+commands:
+  PWPSetting:
+    aliases:
+      - pwps

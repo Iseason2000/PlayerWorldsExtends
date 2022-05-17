@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+}
+
+group = 'top.iseason.bukkit'
+version = '1.6'
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'spigotmc-repo'
+        url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+    }
+    maven {
+        url = 'https://repo.codemc.org/repository/maven-public'
+    }
+}
+
+dependencies {
+    compileOnly fileTree(dir: '../lib', includes: ['*jar'])
+    compileOnly 'org.projectlombok:lombok:1.18.22'
+    annotationProcessor 'org.projectlombok:lombok:1.18.22'
+//    compileOnly 'de.tr7zw:item-nbt-api-plugin:2.9.2'
+}
+
+def targetJavaVersion = 8
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+
+}
+
+tasks.withType(JavaCompile).configureEach {
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release = targetJavaVersion
+    }
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand props
+    }
+}
+//libsDirName = 'C:\\Users\\Iseason2000\\Desktop\\1.12.2梦境科技暑期特供服务端\\plugins'
+libsDirName = "E:\\mc\\cat1.12.2\\plugins"
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'

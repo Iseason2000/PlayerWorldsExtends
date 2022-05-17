@@ -1,0 +1,10 @@
+# 限制方块
+# 权限
+# 方块： playerworldslimiter.block.方块ID.数量 或者 playerworldslimiter.block.all.数量
+# 实体  playerworldslimiter.entity.实体ID.数量 或者 playerworldslimiter.entity.all.数量
+global:
+  blocks:
+  entities:
+
+block-message: "你不能放置这个方块，已达到上限: %max%"
+entity-message: "你不能放置这个实体，已达到上限: %max%"

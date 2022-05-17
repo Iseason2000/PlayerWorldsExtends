@@ -1,0 +1,18 @@
+name: PlayerWorldsLimiter
+version: '${version}'
+main: top.iseason.bukkit.playerworldslimiter.PlayerWorldsLimiter
+api-version: 1.15
+prefix: PWL
+authors: [ Iseason ]
+description: 限制家园方块、实体放置
+depend:
+  - NBTLibrary
+commands:
+  playerworldslimiter:
+    aliases:
+      - 'pwl'
+    usage: "/pwl reload  重载配置"
+  limitSelector:
+    aliases:
+      - 'ls'
+    usage: "/ls block/entity 开启方块/实体选择模式，再次输入关闭,右键增加数量,潜行+右键减少数量"

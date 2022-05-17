@@ -1,0 +1,48 @@
+# 家园 非成员行为控制
+# enable true 为允许，false 为禁止
+# message 禁止时的提示信息 留空不提示
+settings:
+  # 放置方块权限
+  place:
+    enable: false
+    message: "&c你没有权限!"
+  # 破坏方块权限
+  destroy:
+    enable: false
+    message: "&c你没有权限!"
+  # 方块交互权限(左右键互动)
+  block-interact:
+    enable: false
+    message: "&c你没有权限!"
+  # 实体交互权限(左右键互动)，比如村民
+  entity-interact:
+    enable: false
+    message: "&c你没有权限!"
+  # 攻击玩家
+  pvp:
+    enable: false
+    message: "&c你没有权限!"
+  # 攻击除了玩家之外的活着实体
+  pve:
+    enable: false
+    message: "&c你没有权限!"
+  # 攻击没有生命的实体
+  pvd:
+    enable: false
+    message: "&c你没有权限!"
+  # 悬挂物，比如物品展示框、栓绳
+  hanging:
+    enable: false
+    message: "&c你没有权限!"
+  # 丢东西
+  drop:
+    enable: false
+    message: "&c你没有权限!"
+  # 捡起东西
+  pickup:
+    enable: false
+    message: "&c你没有权限!"
+  # 钓鱼
+  fish:
+    enable: false
+    message: "&c你没有权限!"
