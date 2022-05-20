@@ -1,0 +1,11 @@
+name: PlayerWorldsProBackHome
+version: '${version}'
+main: top.iseason.bukkit.playerworldsprobackhome.PlayerWorldsProBackHome
+prefix: PlayerWorldsProBackHome
+authors: [ Iseason ]
+depend: [ PlayerWorldsPro ]
+description: 一键回家园
+commands:
+  PlayerWorldsProBackHome:
+    aliases:
+      - pwpb

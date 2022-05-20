@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'top.iseason.bukkit'
-version = '1.7'
+version = '1.0'
 
 repositories {
     mavenCentral()
@@ -11,16 +11,12 @@ repositories {
         name = 'spigotmc-repo'
         url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
     }
-    maven {
-        url = 'https://repo.codemc.org/repository/maven-public'
-    }
 }
 
 dependencies {
     compileOnly fileTree(dir: '../lib', includes: ['*jar'])
     compileOnly 'org.projectlombok:lombok:1.18.24'
     annotationProcessor 'org.projectlombok:lombok:1.18.24'
-//    compileOnly 'de.tr7zw:item-nbt-api-plugin:2.9.2'
 }
 
 def targetJavaVersion = 8
@@ -47,6 +43,5 @@ processResources {
         expand props
     }
 }
-//libsDirName = 'C:\\Users\\Iseason2000\\Desktop\\1.12.2梦境科技暑期特供服务端\\plugins'
-libsDirName = "E:\\mc\\cat1.12.2\\plugins"
+libsDirName = 'E:\\mc\\cat1.12.2\\plugins'
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'

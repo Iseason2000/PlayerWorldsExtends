@@ -2,11 +2,10 @@ package top.iseason.bukkit.playerworldslimiter;
 
 import com.tuershen.nbtlibrary.NBTLibraryMain;
 import com.tuershen.nbtlibrary.api.NBTTagCompoundApi;
-import com.tuershen.nbtlibrary.common.difference.NBTImp_v1_12_R1;
 import lombok.Getter;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
+import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -14,10 +13,14 @@ import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 public class ConfigManager {
     @Getter
@@ -25,7 +28,7 @@ public class ConfigManager {
     @Getter
     private static HashMap<String, Integer> globalEntities = null;
     @Getter
-    private static HashMap<String, HashMap<String, Integer>> blockData = null;
+    private static HashMap<String, HashMap<String, List<Position>>> blockData = null;
     @Getter
     private static HashMap<String, HashMap<String, Integer>> entityData = null;
     private static PlayerWorldsLimiter plugin;
@@ -73,22 +76,33 @@ public class ConfigManager {
 
 
     public static void loadData() {
-        File file = new File(plugin.getDataFolder(), "data.yml");
-        if (!file.exists()) {
-            plugin.saveResource("data.yml", false);
+        String pathStr = plugin.getDataFolder().toString() + File.separatorChar + "worldData";
+        Path path = Paths.get(pathStr);
+        File file1 = path.toFile();
+        if (!file1.exists()) {
+            file1.mkdir();
         }
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        HashMap<String, HashMap<String, Integer>> wMap = new HashMap<>();
+        HashMap<String, HashMap<String, List<Position>>> wMap = new HashMap<>();
         HashMap<String, HashMap<String, Integer>> eMap = new HashMap<>();
-        for (String worldName : config.getKeys(false)) {
-            HashMap<String, Integer> map = loadMap(config.getConfigurationSection(worldName + ".blocks"));
-            wMap.put(worldName, map);
-            HashMap<String, Integer> ap2 = loadMap(config.getConfigurationSection(worldName + ".entities"));
-            eMap.put(worldName, ap2);
+        try (Stream<Path> paths = Files.walk(path)) {
+            paths.filter(Files::isRegularFile)
+                    .forEach(file -> {
+                                String fileName = file.getFileName().toString();
+                                if (!fileName.endsWith(".yml")) return;
+                                String worldName = fileName.replace(".yml", "");
+                                YamlConfiguration config = YamlConfiguration.loadConfiguration(file.toFile());
+                                HashMap<String, List<Position>> map = loadBlockMap(config.getConfigurationSection("blocks"));
+                                wMap.put(worldName, map);
+                                HashMap<String, Integer> ap2 = loadMap(config.getConfigurationSection("entities"));
+                                eMap.put(worldName, ap2);
+                            }
+                    );
+        } catch (IOException ignored) {
         }
         blockData = wMap;
         entityData = eMap;
     }
+
 
     public static void loadOfflinePerm() {
         File file = new File(plugin.getDataFolder(), "offline_permissions.yml");
@@ -136,23 +150,64 @@ public class ConfigManager {
         return map;
     }
 
+    private static HashMap<String, List<Position>> loadBlockMap(ConfigurationSection section) {
+        HashMap<String, List<Position>> map = new HashMap<>();
+        if (section == null) return map;
+        for (String key : section.getKeys(false)) {
+            map.put(key, Position.fromStringList(section.getStringList(key)));
+        }
+        return map;
+    }
+
     public static void saveData() {
         if (blockData == null) return;
-        File file = new File(plugin.getDataFolder(), "data.yml");
-        YamlConfiguration configuration = new YamlConfiguration();
+        String pathStr = plugin.getDataFolder().toString() + File.separatorChar + "worldData";
+        Path path = Paths.get(pathStr);
+        File file1 = path.toFile();
+        if (!file1.exists()) {
+            file1.mkdir();
+        }
         blockData.forEach((worldName, dMap) -> {
-            ConfigurationSection section = configuration.createSection(worldName + ".blocks");
-            dMap.forEach(section::set);
+            File file = new File(file1, worldName + ".yml");
+            YamlConfiguration configuration = new YamlConfiguration();
+            ConfigurationSection section = configuration.createSection("blocks");
+            dMap.forEach((k, p) -> {
+                ArrayList<String> strings = new ArrayList<>();
+                for (Position position : p) {
+                    strings.add(position.toString());
+                }
+                section.set(k, strings);
+            });
+            try {
+                configuration.save(file);
+            } catch (IOException ignored) {
+            }
         });
         entityData.forEach((worldName, dMap) -> {
-            ConfigurationSection section = configuration.createSection(worldName + ".entities");
+            File file = new File(file1, worldName + ".yml");
+            YamlConfiguration configuration = YamlConfiguration.loadConfiguration(file);
+            ConfigurationSection section = configuration.createSection("entities");
             dMap.forEach(section::set);
+            try {
+                configuration.save(file);
+            } catch (IOException ignored) {
+            }
         });
-        try {
-            configuration.save(file);
-        } catch (IOException e) {
-            plugin.getLogger().warning("数据保存异常!");
-        }
+
+    }
+
+    public static void updateBlockData(World world) {
+        HashMap<String, List<Position>> map = blockData.get(world.getName());
+        if (map == null) return;
+        map.forEach((k, pos) -> pos.removeIf(p -> !k.equals(getBlockID(world.getBlockAt(p.getX(), p.getY(), p.getZ())))));
+    }
+
+    public static void updateBlockDataAsync(World world) {
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> updateBlockData(world));
+    }
+
+    public static void runAsynchronously(Runnable runnable) {
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, runnable);
     }
 
     public static void loadConfigAsync() {
@@ -209,9 +264,6 @@ public class ConfigManager {
                 if (m != null) return m;
             }
             //没有权限
-            if ("block".equals(pre))
-                return ConfigManager.getGlobalBlocks().get(type);
-            else return ConfigManager.getGlobalEntities().get(type);
         } else {
             //不在线
             List<String> strings = ConfigManager.getOfflinePermissions().get(uuid);
@@ -222,10 +274,10 @@ public class ConfigManager {
                 }
             }
             //没有权限
-            if ("block".equals(pre))
-                return ConfigManager.getGlobalBlocks().get(type);
-            else return ConfigManager.getGlobalEntities().get(type);
         }
+        if ("block".equals(pre))
+            return ConfigManager.getGlobalBlocks().get(type);
+        else return ConfigManager.getGlobalEntities().get(type);
     }
 
 
@@ -276,5 +328,37 @@ public class ConfigManager {
         } catch (Exception e) {
             return block.getType().toString().toLowerCase();
         }
+    }
+
+    public static void scanAll(CommandSender sender) {
+        long l = System.currentTimeMillis();
+        sender.sendMessage(ChatColor.YELLOW + "开始扫描所有世界...");
+        for (World world : Bukkit.getWorlds()) {
+            scanWorld(world);
+        }
+        sender.sendMessage(ChatColor.GREEN + "扫描结束,耗时: " + ChatColor.GREEN + (System.currentTimeMillis() - l) + " 毫秒");
+    }
+
+    public static void scanWorld(World world) {
+        String ownerUUID = PlayerWorldsLimiter.getOwnerUUID(world.getName());
+        if (ownerUUID == null) return;
+        for (Chunk loadedChunk : world.getLoadedChunks()) {
+            for (int x = 0; x <= 15; x++) {
+                for (int y = 0; y <= 255; y++) {
+                    for (int z = 0; z <= 15; z++) {
+                        Block block = loadedChunk.getBlock(x, y, z);
+                        if (block.isEmpty() || block.isLiquid()) continue;
+                        BlockListener.addBlock(block, true);
+                    }
+                }
+            }
+        }
+    }
+
+    public static void scanWorld(World world, CommandSender sender) {
+        long l = System.currentTimeMillis();
+        sender.sendMessage(ChatColor.YELLOW + "开始扫描世界...");
+        scanWorld(world);
+        sender.sendMessage(ChatColor.GREEN + "扫描结束,耗时: " + ChatColor.GREEN + (System.currentTimeMillis() - l) + " 毫秒");
     }
 }

@@ -51,6 +51,16 @@ public class SelectCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        if ("update".equals(arg)) {
+            ConfigManager.updateBlockDataAsync(player.getWorld());
+            sender.sendMessage(ChatColor.GREEN + "已更新当前世界的黑名单方块数量");
+        }
+        if ("scan".equals(arg)) {
+            ConfigManager.runAsynchronously(() -> ConfigManager.scanWorld(player.getWorld(), player));
+        }
+        if ("scanAll".equals(arg)) {
+            ConfigManager.runAsynchronously(() -> ConfigManager.scanAll(player));
+        }
         return true;
     }
 
@@ -60,6 +70,9 @@ public class SelectCommand implements CommandExecutor, TabCompleter {
             List<String> list = new ArrayList<>();
             list.add("block");
             list.add("entity");
+            list.add("update");
+            list.add("scan");
+            list.add("scanAll");
             list.removeIf(s -> !s.startsWith(args[0].toLowerCase()));
             return list;
         }

@@ -1,6 +1,7 @@
 package top.iseason.bukkit.playerworldslimiter;
 
 import org.bukkit.ChatColor;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -18,7 +19,9 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SpawnEggMeta;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 public class BlockListener implements Listener {
@@ -28,38 +31,27 @@ public class BlockListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlaceEvent(BlockPlaceEvent event) {
         Block block = event.getBlock();
-        String name = block.getWorld().getName();
-        //只对家园生效
-        if (PlayerWorldsLimiter.getOwnerUUID(name) == null) {
+        if (event.getPlayer().isOp()) {
             return;
         }
-        String type = ConfigManager.getBlockID(block);
-        Integer max = ConfigManager.getMax(name, type, "block");
-        if (max == null) return;
-        HashMap<String, Integer> map = ConfigManager.getBlockData().get(name);
-        int count = 0;
-        HashMap<String, Integer> data = map;
-        if (map != null) {
-            Integer current = map.get(type);
-            if (current != null) {
-                count = current;
-            }
-        } else {
-            data = new HashMap<>();
-            ConfigManager.getBlockData().put(name, data);
-        }
-        if (count + 1 > max) {
-            event.setCancelled(true);
-            String blockMessage = ConfigManager.getBlockMessage();
-            if (!blockMessage.isEmpty())
-                event.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&', blockMessage.replace("%max%", max.toString())));
-        } else data.put(type, count + 1);
+        int max = addBlock(block,false);
+        if (max == -1) return;
+        event.setCancelled(true);
+        String blockMessage = ConfigManager.getBlockMessage();
+        if (!blockMessage.isEmpty())
+            event.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&', blockMessage.replace("%max%", String.valueOf(max))));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreakEvent(BlockBreakEvent event) {
-        reduceBlock(event.getBlock());
+        World world = event.getBlock().getWorld();
+        //只对家园生效
+        if (PlayerWorldsLimiter.getOwnerUUID(world.getName()) == null) {
+            return;
+        }
+        ConfigManager.updateBlockDataAsync(world);
     }
+
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockFadeEvent(BlockFadeEvent event) {
@@ -94,22 +86,10 @@ public class BlockListener implements Listener {
         Integer max = ConfigManager.getMax(name, type, "block");
         //说明不限制
         if (max == null) return;
-        HashMap<String, Integer> map = ConfigManager.getBlockData().get(name);
-        int count = 0;
-        HashMap<String, Integer> data = map;
-        if (map != null) {
-            Integer current = map.get(type);
-            if (current != null) {
-                count = current;
-            }
-        } else {
-            //还没有数据
-            data = new HashMap<>();
-            ConfigManager.getBlockData().put(name, data);
-        }
-        count--;
-        count = Math.max(count, 0);
-        data.put(type, count);
+        HashMap<String, List<Position>> map = ConfigManager.getBlockData().computeIfAbsent(name, k -> new HashMap<>());
+        List<Position> positions = map.computeIfAbsent(type, k -> new ArrayList<>());
+        Position position = Position.fromBlock(block);
+        positions.removeIf(it -> it.equals(position));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -124,7 +104,7 @@ public class BlockListener implements Listener {
         }
         LivingEntity entity = event.getEntity();
         String name = event.getLocation().getWorld().getName();
-        String type = entity.toString();
+        String type = entity.toString().replace(" ","_");
         Integer max = ConfigManager.getMax(name, type, "entity");
         if (max == null) return;
         HashMap<String, HashMap<String, Integer>> entityData = ConfigManager.getEntityData();
@@ -167,25 +147,19 @@ public class BlockListener implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         LivingEntity entity = event.getEntity();
         String name = entity.getLocation().getWorld().getName();
-        String type = entity.toString();
+        String type = entity.toString().replace(" ","_");
         Integer max = ConfigManager.getMax(name, type, "entity");
         //说明不限制
         if (max == null) return;
-        HashMap<String, Integer> map = ConfigManager.getEntityData().get(name);
+        HashMap<String, Integer> map = ConfigManager.getEntityData().computeIfAbsent(name, k -> new HashMap<>());
         int count = 0;
-        HashMap<String, Integer> data = map;
-        if (map != null) {
-            Integer current = map.get(type);
-            if (current != null) {
-                count = current;
-            }
-        } else {
-            data = new HashMap<>();
-            ConfigManager.getEntityData().put(name, data);
+        Integer current = map.get(type);
+        if (current != null) {
+            count = current;
         }
         count--;
         count = Math.max(count, 0);
-        data.put(type, count);
+        map.put(type, count);
     }
 
 
@@ -200,7 +174,7 @@ public class BlockListener implements Listener {
         Player player = event.getPlayer();
         UUID uniqueId = player.getUniqueId();
         if (SelectCommand.entitySelectors.contains(uniqueId)) {
-            String type = event.getRightClicked().toString();
+            String type = event.getRightClicked().toString().replace(" ","_");
             Integer integer = ConfigManager.getGlobalEntities().get(type);
             int apply = 1;
             if (player.isSneaking()) apply = -1;
@@ -262,6 +236,47 @@ public class BlockListener implements Listener {
             event.setCancelled(true);
             player.sendMessage(ChatColor.GREEN + "方块 " + type + ChatColor.GREEN + " 限制数量为: " + ChatColor.YELLOW + integer);
 
+        }
+    }
+
+    // 返回 max 达到限制 -1不限制
+    public static int addBlock(Block block, boolean force) {
+        String name = block.getWorld().getName();
+        //只对家园生效
+        if (PlayerWorldsLimiter.getOwnerUUID(name) == null) {
+            return -1;
+        }
+        String type = ConfigManager.getBlockID(block);
+        Integer max = ConfigManager.getMax(name, type, "block");
+        if (max == null) return -1;
+        HashMap<String, List<Position>> map = ConfigManager.getBlockData().get(name);
+        int count = 0;
+        HashMap<String, List<Position>> data = map;
+        if (map != null) {
+            List<Position> current = map.get(type);
+            if (current != null) {
+                count = current.size();
+            }
+        } else {
+            data = new HashMap<>();
+            ConfigManager.getBlockData().put(name, data);
+        }
+        if (count + 1 > max && !force) {
+            return max;
+        } else {
+            List<Position> positions = data.computeIfAbsent(type, k -> new ArrayList<>());
+            Position position1 = Position.fromBlock(block);
+            boolean contains = false;
+            for (Position position : positions) {
+                if (position.equals(position1)) {
+                    contains = true;
+                    break;
+                }
+            }
+            if (!contains) {
+                positions.add(position1);
+            }
+            return -1;
         }
     }
 
