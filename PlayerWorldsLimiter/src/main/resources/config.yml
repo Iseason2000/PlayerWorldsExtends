@@ -8,3 +8,5 @@ global:
 
 block-message: "你不能放置这个方块，已达到上限: %max%"
 entity-message: "你不能放置这个实体，已达到上限: %max%"
+
+mapper:

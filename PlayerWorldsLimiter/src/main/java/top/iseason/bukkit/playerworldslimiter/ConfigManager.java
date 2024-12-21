@@ -1,7 +1,7 @@
 package top.iseason.bukkit.playerworldslimiter;
 
-import com.tuershen.nbtlibrary.NBTLibraryMain;
-import com.tuershen.nbtlibrary.api.NBTTagCompoundApi;
+import de.tr7zw.nbtapi.NBT;
+import de.tr7zw.nbtapi.iface.ReadWriteNBT;
 import lombok.Getter;
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -9,6 +9,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.io.File;
@@ -16,24 +17,24 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 public class ConfigManager {
     @Getter
-    private static HashMap<String, Integer> globalBlocks = null;
+    private static ConcurrentHashMap<String, Integer> globalBlocks = null;
     @Getter
-    private static HashMap<String, Integer> globalEntities = null;
+    private static ConcurrentHashMap<String, Integer> globalEntities = null;
     @Getter
-    private static HashMap<String, HashMap<String, List<Position>>> blockData = null;
+    private static ConcurrentHashMap<String, ConcurrentHashMap<String, Set<Position>>> blockData = null;
     @Getter
-    private static HashMap<String, HashMap<String, Integer>> entityData = null;
+    private static ConcurrentHashMap<String, ConcurrentHashMap<String, Integer>> entityData = null;
     private static PlayerWorldsLimiter plugin;
     @Getter
-    private static HashMap<UUID, List<String>> offlinePermissions = new HashMap<>();
+    private static ConcurrentHashMap<UUID, List<String>> offlinePermissions = new ConcurrentHashMap<>();
+    @Getter
+    private static Map<String, String> idMapper = null;
     @Getter
     private static String blockMessage = "";
     @Getter
@@ -50,6 +51,7 @@ public class ConfigManager {
         globalEntities = loadMap(config.getConfigurationSection("global.entities"));
         blockMessage = config.getString("block-message", "");
         entityMessage = config.getString("entity-message", "");
+        idMapper = loadStringMap(config.getConfigurationSection("mapper"));
         plugin.getLogger().info("已加载 " + globalBlocks.size() + " 个全局方块限制");
         plugin.getLogger().info("已加载 " + globalEntities.size() + " 个全局实体限制");
     }
@@ -60,13 +62,20 @@ public class ConfigManager {
             plugin.saveResource("config.yml", false);
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+
         ConfigurationSection blocks = config.getConfigurationSection("global.blocks");
         if (blocks == null) blocks = config.createSection("global.blocks");
         ConfigurationSection finalBlocks = blocks;
         globalBlocks.forEach(finalBlocks::set);
+
+        ConfigurationSection mapper = config.getConfigurationSection("mapper");
+        if (mapper == null) mapper = config.createSection("mapper");
+        idMapper.forEach(mapper::set);
+
         ConfigurationSection entities = config.getConfigurationSection("global.entities");
         if (entities == null) entities = config.createSection("global.entities");
         globalEntities.forEach(entities::set);
+
         try {
             config.save(file);
         } catch (IOException e) {
@@ -82,8 +91,8 @@ public class ConfigManager {
         if (!file1.exists()) {
             file1.mkdir();
         }
-        HashMap<String, HashMap<String, List<Position>>> wMap = new HashMap<>();
-        HashMap<String, HashMap<String, Integer>> eMap = new HashMap<>();
+        ConcurrentHashMap<String, ConcurrentHashMap<String, Set<Position>>> wMap = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String, ConcurrentHashMap<String, Integer>> eMap = new ConcurrentHashMap<>();
         try (Stream<Path> paths = Files.walk(path)) {
             paths.filter(Files::isRegularFile)
                     .forEach(file -> {
@@ -91,13 +100,14 @@ public class ConfigManager {
                                 if (!fileName.endsWith(".yml")) return;
                                 String worldName = fileName.replace(".yml", "");
                                 YamlConfiguration config = YamlConfiguration.loadConfiguration(file.toFile());
-                                HashMap<String, List<Position>> map = loadBlockMap(config.getConfigurationSection("blocks"));
+                                ConcurrentHashMap<String, Set<Position>> map = loadBlockMap(config.getConfigurationSection("blocks"));
                                 wMap.put(worldName, map);
-                                HashMap<String, Integer> ap2 = loadMap(config.getConfigurationSection("entities"));
+                                ConcurrentHashMap<String, Integer> ap2 = loadMap(config.getConfigurationSection("entities"));
                                 eMap.put(worldName, ap2);
                             }
                     );
-        } catch (IOException ignored) {
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         blockData = wMap;
         entityData = eMap;
@@ -110,7 +120,7 @@ public class ConfigManager {
             plugin.saveResource("offline_permissions.yml", false);
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        HashMap<UUID, List<String>> wMap = new HashMap<>();
+        ConcurrentHashMap<UUID, List<String>> wMap = new ConcurrentHashMap<>();
         for (String uuids : config.getKeys(false)) {
             try {
                 UUID uuid = UUID.fromString(uuids);
@@ -141,8 +151,8 @@ public class ConfigManager {
         });
     }
 
-    private static HashMap<String, Integer> loadMap(ConfigurationSection section) {
-        HashMap<String, Integer> map = new HashMap<>();
+    private static ConcurrentHashMap<String, Integer> loadMap(ConfigurationSection section) {
+        ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();
         if (section == null) return map;
         for (String key : section.getKeys(false)) {
             map.put(key, section.getInt(key, 0));
@@ -150,8 +160,17 @@ public class ConfigManager {
         return map;
     }
 
-    private static HashMap<String, List<Position>> loadBlockMap(ConfigurationSection section) {
-        HashMap<String, List<Position>> map = new HashMap<>();
+    private static Map<String, String> loadStringMap(ConfigurationSection section) {
+        HashMap<String, String> map = new HashMap<>();
+        if (section == null) return map;
+        for (String key : section.getKeys(false)) {
+            map.put(key, section.getString(key));
+        }
+        return map;
+    }
+
+    private static ConcurrentHashMap<String, Set<Position>> loadBlockMap(ConfigurationSection section) {
+        ConcurrentHashMap<String, Set<Position>> map = new ConcurrentHashMap<>();
         if (section == null) return map;
         for (String key : section.getKeys(false)) {
             map.put(key, Position.fromStringList(section.getStringList(key)));
@@ -161,45 +180,100 @@ public class ConfigManager {
 
     public static void saveData() {
         if (blockData == null) return;
-        String pathStr = plugin.getDataFolder().toString() + File.separatorChar + "worldData";
-        Path path = Paths.get(pathStr);
-        File file1 = path.toFile();
-        if (!file1.exists()) {
-            file1.mkdir();
-        }
+        File file = getDataFile();
         blockData.forEach((worldName, dMap) -> {
-            File file = new File(file1, worldName + ".yml");
-            YamlConfiguration configuration = new YamlConfiguration();
-            ConfigurationSection section = configuration.createSection("blocks");
-            dMap.forEach((k, p) -> {
-                ArrayList<String> strings = new ArrayList<>();
-                for (Position position : p) {
-                    strings.add(position.toString());
-                }
-                section.set(k, strings);
-            });
-            try {
-                configuration.save(file);
-            } catch (IOException ignored) {
-            }
+            saveBlock(worldName, file, dMap);
         });
         entityData.forEach((worldName, dMap) -> {
-            File file = new File(file1, worldName + ".yml");
-            YamlConfiguration configuration = YamlConfiguration.loadConfiguration(file);
-            ConfigurationSection section = configuration.createSection("entities");
-            dMap.forEach(section::set);
-            try {
-                configuration.save(file);
-            } catch (IOException ignored) {
-            }
+            saveEntity(worldName, file, dMap);
         });
 
     }
 
+    public static File getDataFile() {
+        String pathStr = plugin.getDataFolder().toString() + File.separatorChar + "worldData";
+        Path path = Paths.get(pathStr);
+        File file = path.toFile();
+        if (!file.exists()) {
+            file.mkdir();
+        }
+        return file;
+    }
+
+    public static void saveData(String worldName) {
+        if (blockData == null) return;
+        File file = getDataFile();
+        ConcurrentHashMap<String, Set<Position>> blockMap = blockData.get(worldName);
+        if (blockMap != null) {
+            saveBlock(worldName, file, blockMap);
+        }
+        ConcurrentHashMap<String, Integer> entityData = ConfigManager.entityData.get(worldName);
+        if (entityData != null) {
+            saveEntity(worldName, file, entityData);
+        }
+    }
+
+    private static void saveEntity(String worldName, File file1, ConcurrentHashMap<String, Integer> entityData) {
+        File file = new File(file1, worldName + ".yml");
+        YamlConfiguration configuration = YamlConfiguration.loadConfiguration(file);
+        ConfigurationSection section = configuration.createSection("entities");
+        entityData.forEach(section::set);
+        try {
+            configuration.save(file);
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static void saveBlock(String worldName, File file1, ConcurrentHashMap<String, Set<Position>> blockMap) {
+        File file = new File(file1, worldName + ".yml");
+        YamlConfiguration configuration = new YamlConfiguration();
+        ConfigurationSection section = configuration.createSection("blocks");
+        blockMap.forEach((k, p) -> {
+            ArrayList<String> strings = new ArrayList<>();
+            for (Position position : p) {
+                strings.add(position.toString());
+            }
+            section.set(k, strings);
+        });
+        try {
+            configuration.save(file);
+        } catch (IOException ignored) {
+        }
+    }
+
+    public static boolean canUpdate(World world) {
+        return blockData.containsKey(world.getName());
+    }
+
+
     public static void updateBlockData(World world) {
-        HashMap<String, List<Position>> map = blockData.get(world.getName());
+        ConcurrentHashMap<String, Set<Position>> map = blockData.get(world.getName());
         if (map == null) return;
-        map.forEach((k, pos) -> pos.removeIf(p -> !k.equals(getBlockID(world.getBlockAt(p.getX(), p.getY(), p.getZ())))));
+        map.forEach((k, pos) ->
+                pos.removeIf(
+                        p -> {
+                            String blockID = getBlockID(world.getBlockAt(p.getX(), p.getY(), p.getZ()));
+                            String type = ConfigManager.getIdMapper().get(blockID);
+                            return !k.equals(type);
+                        }
+                )
+        );
+    }
+
+    public static void updateBlockTypeData(World world, String type) {
+        ConcurrentHashMap<String, Set<Position>> map = blockData.get(world.getName());
+        if (map == null) return;
+        Set<Position> positions = map.get(type);
+        if (positions == null) return;
+        positions.removeIf(
+                p -> {
+                    Block blockAt = world.getBlockAt(p.getX(), p.getY(), p.getZ());
+                    String blockID = getBlockID(blockAt);
+                    if ("nae2:crafting_storage".equals(blockID)) return false; //ae储存方块所有数据都一样，很傻逼
+                    String mapper = ConfigManager.getIdMapper().get(blockID);
+                    return !type.equals(mapper);
+                }
+        );
     }
 
     public static void updateBlockDataAsync(World world) {
@@ -307,27 +381,36 @@ public class ConfigManager {
 
     public static String getBlockID(Block block) {
         try {
-            NBTTagCompoundApi api = NBTLibraryMain.libraryApi.getTileEntityCompoundApi(block).getNBTTagCompound();
-//            NBTImp_v1_12_R1 ser = (NBTImp_v1_12_R1)api;
-//            System.out.println(ser.deserializeNBTTagCompound(api.getNBTTagCompoundApi()));
-//            System.out.println(block.getType());
-//            System.out.println(block.getTypeId());
-            if (api.hasKey("id")) {
-                if (api.hasKey("subTileName")) {
-                    return api.getString("id") + "_" + api.getString("subTileName");
-                } else if (api.hasKey("def:0")) {
-                    NBTTagCompoundApi compound = api.getCompound("def:0");
-                    if (compound.hasKey("Damage")) return api.getString("id") + "_" + compound.getByte("Damage");
-                }
-                String id = api.getString("id").replace(":", "_");
-                String s = block.getType().toString().toLowerCase();
-                if (s.startsWith(id) && s.length() != id.length()) return s;
-                if (block.getData() != 0) return api.getString("id") + "_" + block.getData();
-                return id;
-            } else return block.getType().toString().toLowerCase();
+            if (block.isEmpty()) return "air";
+            return NBT.get(block.getState(), it -> {
+                StringBuilder id = new StringBuilder(it.getString("id"));
+                if (it.hasTag("parentMachine")) id.append("_").append(it.getString("parentMachine"));
+
+                return id.toString();
+            });
         } catch (Exception e) {
-            return block.getType().toString().toLowerCase();
+            byte data = block.getData();
+            String lowerCase = block.getType().toString().toLowerCase();
+            if (data != 0) return lowerCase + "_" + data;
+            return lowerCase;
         }
+    }
+
+    public static String getItemID(ItemStack item) {
+        try {
+            if (item.getType() == Material.AIR) return "air";
+            ReadWriteNBT readWriteNBT = NBT.itemStackToNBT(item);
+            String id = readWriteNBT.getString("id");
+            Short damage = readWriteNBT.getShort("Damage");
+            if (damage > 0) return id + "_" + damage;
+            return id;
+        } catch (Exception e) {
+            String lowerCase = item.getType().toString().toLowerCase();
+            byte data = item.getData().getData();
+            if (data != 0) return lowerCase + "_" + data;
+            return lowerCase;
+        }
+
     }
 
     public static void scanAll(CommandSender sender) {
@@ -336,12 +419,17 @@ public class ConfigManager {
         for (World world : Bukkit.getWorlds()) {
             scanWorld(world);
         }
+        saveData();
         sender.sendMessage(ChatColor.GREEN + "扫描结束,耗时: " + ChatColor.GREEN + (System.currentTimeMillis() - l) + " 毫秒");
     }
 
     public static void scanWorld(World world) {
         String ownerUUID = PlayerWorldsLimiter.getOwnerUUID(world.getName());
         if (ownerUUID == null) return;
+        ConcurrentHashMap<String, Set<Position>> map = ConfigManager.getBlockData().get(world.getName());
+        if (map != null) {
+            map.clear();
+        }
         for (Chunk loadedChunk : world.getLoadedChunks()) {
             for (int x = 0; x <= 15; x++) {
                 for (int y = 0; y <= 255; y++) {
@@ -359,6 +447,7 @@ public class ConfigManager {
         long l = System.currentTimeMillis();
         sender.sendMessage(ChatColor.YELLOW + "开始扫描世界...");
         scanWorld(world);
+        saveData(world.getName());
         sender.sendMessage(ChatColor.GREEN + "扫描结束,耗时: " + ChatColor.GREEN + (System.currentTimeMillis() - l) + " 毫秒");
     }
 }

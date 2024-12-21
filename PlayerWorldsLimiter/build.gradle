@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'top.iseason.bukkit'
-version = '1.7'
+version = '1.16'
 
 repositories {
     mavenCentral()
@@ -20,7 +20,7 @@ dependencies {
     compileOnly fileTree(dir: '../lib', includes: ['*jar'])
     compileOnly 'org.projectlombok:lombok:1.18.24'
     annotationProcessor 'org.projectlombok:lombok:1.18.24'
-//    compileOnly 'de.tr7zw:item-nbt-api-plugin:2.9.2'
+    compileOnly 'de.tr7zw:item-nbt-api-plugin:2.13.2'
 }
 
 def targetJavaVersion = 8

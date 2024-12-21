@@ -1,13 +1,12 @@
 name: PlayerWorldsLimiter
 version: '${version}'
 main: top.iseason.bukkit.playerworldslimiter.PlayerWorldsLimiter
-api-version: 1.15
+api-version: 1.12
 prefix: PWL
 authors: [ Iseason ]
-depend: [ PlayerWorldsPro ]
 description: 限制家园方块、实体放置
 depend:
-  - NBTLibrary
+  - PlayerWorldsPro
 commands:
   playerworldslimiter:
     aliases:

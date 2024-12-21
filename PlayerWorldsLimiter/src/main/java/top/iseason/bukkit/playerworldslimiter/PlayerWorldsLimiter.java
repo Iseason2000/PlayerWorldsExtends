@@ -1,6 +1,6 @@
 package top.iseason.bukkit.playerworldslimiter;
 
-import cz._heropwp.playerworldspro.Main;
+import cz.heroify.playerworldspro.Main;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -12,7 +12,7 @@ public final class PlayerWorldsLimiter extends JavaPlugin {
 
     public static String getOwnerUUID(String worldName) {
         if (pwpMain == null) return null;
-        return pwpMain.B().a(worldName);
+        return pwpMain.getBasicManager().getUUIDFromWorldName(worldName);
     }
 
     @Override

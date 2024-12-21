@@ -1,6 +1,6 @@
 package top.iseason.bukkit.pwpsetting;
 
-import cz._heropwp.playerworldspro.api.API;
+import cz.heroify.playerworldspro.api.API;
 import org.bukkit.ChatColor;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
@@ -29,9 +29,10 @@ public class Listener implements org.bukkit.event.Listener {
     @EventHandler(ignoreCancelled = true)
     public void onBlockBreakEvent(BlockBreakEvent event) {
         Player player = event.getPlayer();
-        if (!checkNotMember(event.getBlock().getLocation().getWorld(), player)) return;
+        if (isMember(event.getBlock().getLocation().getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.destroy.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.destroy")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.destroy"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.destroy.message");
     }
@@ -39,9 +40,10 @@ public class Listener implements org.bukkit.event.Listener {
     @EventHandler(ignoreCancelled = true)
     public void onBlockPlaceEvent(BlockPlaceEvent event) {
         Player player = event.getPlayer();
-        if (!checkNotMember(event.getBlock().getLocation().getWorld(), player)) return;
+        if (isMember(event.getBlock().getLocation().getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.place.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.place")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.place"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.place.message");
     }
@@ -49,7 +51,7 @@ public class Listener implements org.bukkit.event.Listener {
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.block-interact.enable")) return;
         if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.block-interact"))
             return;
@@ -60,7 +62,7 @@ public class Listener implements org.bukkit.event.Listener {
     @EventHandler
     public void onPlayerInteract(PlayerInteractEntityEvent event) {
         Player player = event.getPlayer();
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.entity-interact.enable")) return;
         if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.entity-interact"))
             return;
@@ -81,24 +83,27 @@ public class Listener implements org.bukkit.event.Listener {
             }
         }
         if (player == null) return;
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         Entity entity = event.getEntity();
         if (entity instanceof Player) {
             if (PWPSetting.config.getBoolean("settings.pvp.enable")) return;
-            if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pvp")) return;
+            if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pvp"))
+                return;
             event.setCancelled(true);
             sendMessage(player, "settings.pvp.message");
             return;
         }
         if (entity instanceof LivingEntity) {
             if (PWPSetting.config.getBoolean("settings.pve.enable")) return;
-            if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pve")) return;
+            if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pve"))
+                return;
             event.setCancelled(true);
             sendMessage(player, "settings.pve.message");
             return;
         }
         if (PWPSetting.config.getBoolean("settings.pvd.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pvd")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pvd"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.pvd.message");
     }
@@ -116,9 +121,10 @@ public class Listener implements org.bukkit.event.Listener {
             }
         }
         if (player == null) return;
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.hanging.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.hanging")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.hanging"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.hanging.message");
     }
@@ -126,9 +132,10 @@ public class Listener implements org.bukkit.event.Listener {
     @EventHandler(ignoreCancelled = true)
     public void onHangingPlaceEvent(HangingPlaceEvent event) {
         Player player = event.getPlayer();
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.hanging.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.hanging")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.hanging"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.hanging.message");
     }
@@ -136,9 +143,10 @@ public class Listener implements org.bukkit.event.Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerDropItemEvent(PlayerDropItemEvent event) {
         Player player = event.getPlayer();
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.drop.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.drop")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.drop"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.drop.message");
     }
@@ -148,9 +156,10 @@ public class Listener implements org.bukkit.event.Listener {
         LivingEntity entity = event.getEntity();
         if (!(entity instanceof Player)) return;
         Player player = (Player) entity;
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.pickup.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pickup")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.pickup"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.pickup.message");
     }
@@ -158,18 +167,20 @@ public class Listener implements org.bukkit.event.Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerFishEvent(PlayerFishEvent event) {
         Player player = event.getPlayer();
-        if (!checkNotMember(player.getWorld(), player)) return;
+        if (isMember(player.getWorld(), player)) return;
         if (PWPSetting.config.getBoolean("settings.fish.enable")) return;
-        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.fish")) return;
+        if (player.isOp() || player.hasPermission("pwpsetting.*") || player.hasPermission("pwpsetting.fish"))
+            return;
         event.setCancelled(true);
         sendMessage(player, "settings.fish.message");
     }
 
 
-    private boolean checkNotMember(World world, Player player) {
+    private boolean isMember(World world, Player player) {
+        if (player.isFakePlayer()) return true;
         String ownerUUID = PWPSetting.getOwnerUUID(world.getName());
-        if (ownerUUID == null) return false;
-        return !API.isMember(player, ownerUUID);
+        if (ownerUUID == null) return true;
+        return API.isMember(player, ownerUUID);
     }
 
     private String toColor(String message) {

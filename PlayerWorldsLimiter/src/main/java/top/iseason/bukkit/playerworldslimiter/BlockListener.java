@@ -1,6 +1,10 @@
 package top.iseason.bukkit.playerworldslimiter;
 
+import de.tr7zw.nbtapi.NBT;
+import de.tr7zw.nbtapi.iface.ReadableNBT;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
@@ -8,10 +12,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.*;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -19,10 +23,9 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SpawnEggMeta;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockListener implements Listener {
 
@@ -34,7 +37,20 @@ public class BlockListener implements Listener {
         if (event.getPlayer().isOp()) {
             return;
         }
-        int max = addBlock(block,false);
+        World world = block.getWorld();
+        String worldName = world.getName();
+        if (PlayerWorldsLimiter.getOwnerUUID(worldName) == null) {
+            return;
+        }
+        ItemStack item = event.getItemInHand();
+        String type = ConfigManager.getItemID(item);
+
+        if (ConfigManager.getGlobalBlocks().get(type) == null) {
+            return;
+        }
+
+        ConfigManager.updateBlockTypeData(world, type);
+        int max = addCount(block, false, worldName, type);
         if (max == -1) return;
         event.setCancelled(true);
         String blockMessage = ConfigManager.getBlockMessage();
@@ -42,55 +58,6 @@ public class BlockListener implements Listener {
             event.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&', blockMessage.replace("%max%", String.valueOf(max))));
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onBlockBreakEvent(BlockBreakEvent event) {
-        World world = event.getBlock().getWorld();
-        //只对家园生效
-        if (PlayerWorldsLimiter.getOwnerUUID(world.getName()) == null) {
-            return;
-        }
-        ConfigManager.updateBlockDataAsync(world);
-    }
-
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onBlockFadeEvent(BlockFadeEvent event) {
-        reduceBlock(event.getBlock());
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onBlockExplodeEvent(BlockExplodeEvent event) {
-        reduceBlock(event.getBlock());
-        reduceBlocks(event.blockList());
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onEntityExplodeEvent(EntityExplodeEvent event) {
-        reduceBlocks(event.blockList());
-    }
-
-    public void reduceBlocks(Iterable<Block> blocks) {
-        for (Block block : blocks) {
-            reduceBlock(block);
-        }
-    }
-
-
-    public void reduceBlock(Block block) {
-        String name = block.getWorld().getName();
-        //只对家园生效
-        if (PlayerWorldsLimiter.getOwnerUUID(name) == null) {
-            return;
-        }
-        String type = ConfigManager.getBlockID(block);
-        Integer max = ConfigManager.getMax(name, type, "block");
-        //说明不限制
-        if (max == null) return;
-        HashMap<String, List<Position>> map = ConfigManager.getBlockData().computeIfAbsent(name, k -> new HashMap<>());
-        List<Position> positions = map.computeIfAbsent(type, k -> new ArrayList<>());
-        Position position = Position.fromBlock(block);
-        positions.removeIf(it -> it.equals(position));
-    }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onCreatureSpawn(CreatureSpawnEvent event) {
@@ -104,21 +71,21 @@ public class BlockListener implements Listener {
         }
         LivingEntity entity = event.getEntity();
         String name = event.getLocation().getWorld().getName();
-        String type = entity.toString().replace(" ","_");
+        String type = entity.toString().replace(" ", "_");
         Integer max = ConfigManager.getMax(name, type, "entity");
         if (max == null) return;
-        HashMap<String, HashMap<String, Integer>> entityData = ConfigManager.getEntityData();
+        ConcurrentHashMap<String, ConcurrentHashMap<String, Integer>> entityData = ConfigManager.getEntityData();
         if (entityData == null) return;
-        HashMap<String, Integer> map = entityData.get(name);
+        ConcurrentHashMap<String, Integer> map = entityData.get(name);
         int count = 0;
-        HashMap<String, Integer> data = map;
+        ConcurrentHashMap<String, Integer> data = map;
         if (map != null) {
             Integer current = map.get(type);
             if (current != null) {
                 count = current;
             }
         } else {
-            data = new HashMap<>();
+            data = new ConcurrentHashMap<>();
             ConfigManager.getEntityData().put(name, data);
         }
         if (count + 1 > max) {
@@ -147,11 +114,11 @@ public class BlockListener implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         LivingEntity entity = event.getEntity();
         String name = entity.getLocation().getWorld().getName();
-        String type = entity.toString().replace(" ","_");
+        String type = entity.toString().replace(" ", "_");
         Integer max = ConfigManager.getMax(name, type, "entity");
         //说明不限制
         if (max == null) return;
-        HashMap<String, Integer> map = ConfigManager.getEntityData().computeIfAbsent(name, k -> new HashMap<>());
+        ConcurrentHashMap<String, Integer> map = ConfigManager.getEntityData().computeIfAbsent(name, k -> new ConcurrentHashMap<>());
         int count = 0;
         Integer current = map.get(type);
         if (current != null) {
@@ -174,7 +141,7 @@ public class BlockListener implements Listener {
         Player player = event.getPlayer();
         UUID uniqueId = player.getUniqueId();
         if (SelectCommand.entitySelectors.contains(uniqueId)) {
-            String type = event.getRightClicked().toString().replace(" ","_");
+            String type = event.getRightClicked().toString().replace(" ", "_");
             Integer integer = ConfigManager.getGlobalEntities().get(type);
             int apply = 1;
             if (player.isSneaking()) apply = -1;
@@ -202,80 +169,73 @@ public class BlockListener implements Listener {
 
     }
 
-    @EventHandler
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        if (event.getHand() == EquipmentSlot.OFF_HAND) return;
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
-            return;
-        }
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onBlockPlaceEvent2(BlockPlaceEvent event) {
         Player player = event.getPlayer();
         UUID uniqueId = player.getUniqueId();
-        if (SelectCommand.blockSelectors.contains(uniqueId)) {
-            String type = ConfigManager.getBlockID(event.getClickedBlock());
-            Integer integer = ConfigManager.getGlobalBlocks().get(type);
-            int apply = 1;
-            if (player.isSneaking()) apply = -1;
-            if (integer == null) {
-                if (apply == -1) {
-                    player.sendMessage(ChatColor.GREEN + "方块 " + type + ChatColor.GREEN + " 没有限制");
-                    event.setCancelled(true);
-                    return;
-                }
-                ConfigManager.getGlobalBlocks().put(type, 1);
-                integer = 1;
-            } else {
-                integer += apply;
-                if (integer < 0) {
-                    ConfigManager.getGlobalBlocks().remove(type);
-                    event.setCancelled(true);
-                    player.sendMessage(ChatColor.GREEN + "已取消方块 " + type + ChatColor.GREEN + "的限制!");
-                    return;
-                }
-                ConfigManager.getGlobalBlocks().put(type, integer);
-            }
-            event.setCancelled(true);
-            player.sendMessage(ChatColor.GREEN + "方块 " + type + ChatColor.GREEN + " 限制数量为: " + ChatColor.YELLOW + integer);
+        if (!SelectCommand.blockSelectors.contains(uniqueId)) return;
 
+        System.out.println("Item NBT：" + NBT.itemStackToNBT(event.getItemInHand()));
+//        System.out.println("Block NBT：" + NBT.get(event.getBlock().getState(), ReadableNBT::toString));
+        String type = ConfigManager.getItemID(event.getItemInHand());
+
+        Integer integer = ConfigManager.getGlobalBlocks().get(type);
+        int apply = 1;
+        if (player.isSneaking()) apply = -1;
+        if (integer == null) {
+            if (apply == -1) {
+                player.sendMessage(ChatColor.YELLOW + "方块 " + ChatColor.GRAY + type + ChatColor.YELLOW + " 没有限制");
+                event.setCancelled(true);
+                return;
+            }
+            ConfigManager.getGlobalBlocks().put(type, 1);
+            integer = 1;
+        } else {
+            integer += apply;
+            if (integer < 0) {
+                ConfigManager.getGlobalBlocks().remove(type);
+                event.setCancelled(true);
+                player.sendMessage(ChatColor.GREEN + "已取消方块 " + ChatColor.YELLOW + type + ChatColor.GREEN + " 的限制!");
+                return;
+            }
+            ConfigManager.getGlobalBlocks().put(type, integer);
         }
+        player.sendMessage(ChatColor.GREEN + "方块 " + ChatColor.YELLOW + type + ChatColor.GREEN + " 限制数量为: " + ChatColor.AQUA + integer);
+        Location location = event.getBlock().getLocation();
+        Bukkit.getScheduler().runTaskLater(PlayerWorldsLimiter.getINSTANCE(), () -> {
+            System.out.println("Block NBT：" + NBT.get(event.getBlock().getState(), ReadableNBT::toString));
+            String type2 = ConfigManager.getBlockID(location.getBlock());
+            if (!ConfigManager.getIdMapper().containsKey(type2)) {
+                ConfigManager.getIdMapper().put(type2, type);
+                player.sendMessage(ChatColor.GREEN + "检测到方块在放下之后id为 " + ChatColor.YELLOW + type2 + ChatColor.GREEN + " 已自动添加该映射");
+            }
+        }, 20L);
+    }
+
+    public static void addBlock(Block block, boolean force) {
+        String world = block.getWorld().getName();
+        //只对家园生效
+        if (PlayerWorldsLimiter.getOwnerUUID(world) == null) {
+            return;
+        }
+        String id = ConfigManager.getBlockID(block);
+        String type = ConfigManager.getIdMapper().get(id);
+        addCount(block, force, world, type);
     }
 
     // 返回 max 达到限制 -1不限制
-    public static int addBlock(Block block, boolean force) {
-        String name = block.getWorld().getName();
-        //只对家园生效
-        if (PlayerWorldsLimiter.getOwnerUUID(name) == null) {
-            return -1;
-        }
-        String type = ConfigManager.getBlockID(block);
+    private static int addCount(Block block, boolean force, String name, String type) {
         Integer max = ConfigManager.getMax(name, type, "block");
         if (max == null) return -1;
-        HashMap<String, List<Position>> map = ConfigManager.getBlockData().get(name);
-        int count = 0;
-        HashMap<String, List<Position>> data = map;
-        if (map != null) {
-            List<Position> current = map.get(type);
-            if (current != null) {
-                count = current.size();
-            }
-        } else {
-            data = new HashMap<>();
-            ConfigManager.getBlockData().put(name, data);
-        }
-        if (count + 1 > max && !force) {
+        ConcurrentHashMap<String, Set<Position>> map = ConfigManager
+                .getBlockData()
+                .computeIfAbsent(name, k -> new ConcurrentHashMap<>());
+        Set<Position> current = map.computeIfAbsent(type, k -> ConcurrentHashMap.newKeySet());
+        if (current.size() + 1 > max && !force) {
             return max;
         } else {
-            List<Position> positions = data.computeIfAbsent(type, k -> new ArrayList<>());
             Position position1 = Position.fromBlock(block);
-            boolean contains = false;
-            for (Position position : positions) {
-                if (position.equals(position1)) {
-                    contains = true;
-                    break;
-                }
-            }
-            if (!contains) {
-                positions.add(position1);
-            }
+            current.add(position1);
             return -1;
         }
     }

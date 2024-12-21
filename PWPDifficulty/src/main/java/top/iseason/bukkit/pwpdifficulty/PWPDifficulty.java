@@ -1,9 +1,11 @@
 package top.iseason.bukkit.pwpdifficulty;
 
-import cz._heropwp.playerworldspro.Main;
-import cz._heropwp.playerworldspro.api.API;
-import cz._heropwp.playerworldspro.d.c;
+import cz.heroify.playerworldspro.Main;
+import cz.heroify.playerworldspro.api.API;
+
+import cz.heroify.playerworldspro.utils.ConfigManager;
 import org.bukkit.*;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,12 +18,16 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
+import java.util.ArrayList;
+
+import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public final class PWPDifficulty extends JavaPlugin implements Listener {
-    private static final HashSet<String> blacklist = new HashSet<>();
-    private static final HashSet<String> whitelist = new HashSet<>();
+    private static List<Pattern> globalList = new ArrayList<>();
+    private static List<Pattern> naturalList = new ArrayList<>();
     public static YamlConfiguration config;
     private static Main pwpMain = null;
     private static PWPDifficulty INSTANCE;
@@ -32,17 +38,13 @@ public final class PWPDifficulty extends JavaPlugin implements Listener {
             INSTANCE.saveDefaultConfig();
         }
         config = YamlConfiguration.loadConfiguration(file);
-        blacklist.clear();
-        blacklist.addAll(config.getStringList("global-blacklist"));
-
-        whitelist.clear();
-        whitelist.addAll(config.getStringList("natural-whitelist"));
-
+        globalList = config.getStringList("global-whitelist").stream().map(Pattern::compile).collect(Collectors.toList());
+        naturalList = config.getStringList("natural-whitelist").stream().map(Pattern::compile).collect(Collectors.toList());
     }
 
     public static void save() {
-        config.set("global-blacklist", blacklist.toArray());
-        config.set("natural-whitelist", whitelist.toArray());
+        config.set("global-whitelist", globalList.stream().map(Pattern::toString).collect(Collectors.toList()));
+        config.set("natural-whitelist", naturalList.stream().map(Pattern::toString).collect(Collectors.toList()));
         try {
             config.save(new File(INSTANCE.getDataFolder(), "config.yml"));
         } catch (IOException ignored) {
@@ -50,7 +52,7 @@ public final class PWPDifficulty extends JavaPlugin implements Listener {
     }
 
     public static String getOwnerUUID(String worldName) {
-        return pwpMain.B().a(worldName);
+        return pwpMain.getBasicManager().getUUIDFromWorldName(worldName);
     }
 
     public static void setDifficulties(Difficulty difficulty) {
@@ -69,10 +71,12 @@ public final class PWPDifficulty extends JavaPlugin implements Listener {
             return;
         }
         if (difficulty == null) return;
-        pwpMain.D().b(c.a.DATA).set("Worlds." + ownerUUID + ".1.Difficulty", difficulty.toString());
-        pwpMain.D().c(c.a.DATA);
-        pwpMain.D().d(c.a.DATA);
-        for (final String worlds : pwpMain.G().a(worldName)) {
+        ConfigManager configManager = pwpMain.getConfigManager();
+        FileConfiguration config = configManager.getConfig(ConfigManager.Configurations.DATA);
+        config.set("Worlds." + ownerUUID + ".1.Difficulty", difficulty.toString());
+        configManager.saveConfig(ConfigManager.Configurations.DATA);
+
+        for (final String worlds : pwpMain.getWorldManager().getAvailableWorlds(worldName)) {
             final World world = Bukkit.getWorld(worlds);
             if (world != null) {
                 world.setDifficulty(difficulty);
@@ -131,15 +135,16 @@ public final class PWPDifficulty extends JavaPlugin implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onCreatureSpawnEvent(CreatureSpawnEvent event) {
+        String type = event.getEntity().toString();
         if (getOwnerUUID(event.getLocation().getWorld().getName()) == null) {
             return;
         }
-        String type = event.getEntity().toString();
-        if (blacklist.contains(type)) {
+
+        if ((event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.NATURAL || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CHUNK_GEN) && !isMatch(naturalList, type)) {
             event.setCancelled(true);
             return;
         }
-        if (!whitelist.contains(type) && (event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.NATURAL || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CHUNK_GEN)) {
+        if (!isMatch(globalList, type)) {
             event.setCancelled(true);
         }
     }
@@ -150,11 +155,11 @@ public final class PWPDifficulty extends JavaPlugin implements Listener {
         UUID uniqueId = player.getUniqueId();
         if (SelectCommand.blackSelectors.contains(uniqueId)) {
             String type = event.getRightClicked().toString();
-            blacklist.add(type);
+            globalList.add(Pattern.compile("^" + type.replace("{", "\\{").replace("}", "\\}") + "$"));
             player.sendMessage(ChatColor.GREEN + "实体 " + type + " 已添加进黑名单");
         } else if (SelectCommand.whiteSelectors.contains(uniqueId)) {
             String type = event.getRightClicked().toString();
-            whitelist.add(type);
+            naturalList.add(Pattern.compile("^" + type + "$"));
             player.sendMessage(ChatColor.GREEN + "实体 " + type + " 已添加进白名单");
         }
     }
@@ -162,6 +167,13 @@ public final class PWPDifficulty extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
+    }
+
+    public boolean isMatch(List<Pattern> patterns, String entity) {
+        for (Pattern pattern : patterns) {
+            if (pattern.matcher(entity).find()) return true;
+        }
+        return false;
     }
 
     private void updatedWorld(World world, String uuid) {

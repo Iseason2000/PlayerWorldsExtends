@@ -2,8 +2,11 @@
 # 需要op或者pwpdifficulty.admin 权限
 
 #允许自然生成怪物
-global-blacklist:
+global-whitelist:
 
 
 #允许自然生成动物
 natural-whitelist:
+
+ban-list:
+

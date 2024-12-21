@@ -1,6 +1,6 @@
 package top.iseason.bukkit.pwpsetting;
 
-import cz._heropwp.playerworldspro.Main;
+import cz.heroify.playerworldspro.Main;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -50,7 +50,7 @@ public final class PWPSetting extends JavaPlugin implements CommandExecutor {
     }
 
     public static String getOwnerUUID(String worldName) {
-        return pwpMain.B().a(worldName);
+        return pwpMain.getBasicManager().getUUIDFromWorldName(worldName);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package top.iseason.bukkit.playerworldsprobackhome;
 
-import cz._heropwp.playerworldspro.Main;
+import cz.heroify.playerworldspro.Main;
+import cz.heroify.playerworldspro.utils.WorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -34,10 +35,11 @@ public final class PlayerWorldsProBackHome extends JavaPlugin implements Command
         }
         if (player == null) return true;
         String uuid = player.getUniqueId().toString();
-        if (!pwpMain.G().d(uuid)) {
+        WorldManager worldManager = pwpMain.getWorldManager();
+        if (!worldManager.hasWorld(uuid)) {
             return true;
         }
-        pwpMain.G().a(player, uuid, true);
+        worldManager.teleportToWorld(player, uuid, true);
         return true;
     }
 

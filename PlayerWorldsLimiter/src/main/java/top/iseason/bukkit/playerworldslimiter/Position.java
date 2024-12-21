@@ -3,16 +3,14 @@ package top.iseason.bukkit.playerworldslimiter;
 import lombok.Getter;
 import org.bukkit.block.Block;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 
+@Getter
 public class Position {
-    @Getter
     private final int x;
-    @Getter
     private final int y;
-    @Getter
     private final int z;
 
     public Position(int x, int y, int z) {
@@ -37,6 +35,14 @@ public class Position {
         return x == pos.getX() && y == pos.getY() && z == pos.getZ();
     }
 
+    @Override
+    public int hashCode() {
+        int result = x;
+        result = 31 * result + y;
+        result = 31 * result + z;
+        return result;
+    }
+
     public static Position fromString(String str) {
         String[] split = str.split(",");
         if (split.length != 3) return null;
@@ -47,8 +53,8 @@ public class Position {
         }
     }
 
-    public static List<Position> fromStringList(List<String> list) {
-        ArrayList<Position> positions = new ArrayList<>();
+    public static HashSet<Position> fromStringList(List<String> list) {
+        HashSet<Position> positions = new HashSet<>();
         for (String s : list) {
             Position position = Position.fromString(s);
             if (position != null)
