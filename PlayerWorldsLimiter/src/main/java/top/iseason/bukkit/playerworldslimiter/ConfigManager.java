@@ -269,8 +269,17 @@ public class ConfigManager {
                 p -> {
                     Block blockAt = world.getBlockAt(p.getX(), p.getY(), p.getZ());
                     String blockID = getBlockID(blockAt);
-                    if ("nae2:crafting_storage".equals(blockID)) return false; //ae储存方块所有数据都一样，很傻逼
+//                    if ("nae2:crafting_storage".equals(blockID)) return false; //ae储存方块所有数据都一样，很傻逼
+//                    if ("appliedenergistics2:crafting_storage".equals(blockID)) return false; //ae储存方块所有数据都一样，很傻逼
                     String mapper = ConfigManager.getIdMapper().get(blockID);
+                    if (".*".equals(mapper)) {
+                        Collection<ItemStack> drops = blockAt.getDrops();
+                        Iterator<ItemStack> iterator = drops.iterator();
+                        if (iterator.hasNext()) {
+                            ItemStack next = iterator.next();
+                            mapper = getItemID(next);
+                        }
+                    }
                     return !type.equals(mapper);
                 }
         );
@@ -282,6 +291,10 @@ public class ConfigManager {
 
     public static void runAsynchronously(Runnable runnable) {
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, runnable);
+    }
+
+    public static void runSync(Runnable runnable) {
+        plugin.getServer().getScheduler().runTask(plugin, runnable);
     }
 
     public static void loadConfigAsync() {
@@ -392,6 +405,7 @@ public class ConfigManager {
             byte data = block.getData();
             String lowerCase = block.getType().toString().toLowerCase();
             if (data != 0) return lowerCase + "_" + data;
+
             return lowerCase;
         }
     }
@@ -424,19 +438,21 @@ public class ConfigManager {
     }
 
     public static void scanWorld(World world) {
-        String ownerUUID = PlayerWorldsLimiter.getOwnerUUID(world.getName());
+        String worldName = world.getName();
+        String ownerUUID = PlayerWorldsLimiter.getOwnerUUID(worldName);
         if (ownerUUID == null) return;
-        ConcurrentHashMap<String, Set<Position>> map = ConfigManager.getBlockData().get(world.getName());
+        ConcurrentHashMap<String, Set<Position>> map = ConfigManager.getBlockData().get(worldName);
         if (map != null) {
             map.clear();
         }
+
         for (Chunk loadedChunk : world.getLoadedChunks()) {
             for (int x = 0; x <= 15; x++) {
                 for (int y = 0; y <= 255; y++) {
                     for (int z = 0; z <= 15; z++) {
                         Block block = loadedChunk.getBlock(x, y, z);
                         if (block.isEmpty() || block.isLiquid()) continue;
-                        BlockListener.addBlock(block, true);
+                        BlockListener.addBlock(block, worldName, true);
                     }
                 }
             }

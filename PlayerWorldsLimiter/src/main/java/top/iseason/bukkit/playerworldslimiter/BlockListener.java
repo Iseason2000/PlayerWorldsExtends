@@ -23,6 +23,8 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SpawnEggMeta;
 
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -204,7 +206,9 @@ public class BlockListener implements Listener {
         Location location = event.getBlock().getLocation();
         Bukkit.getScheduler().runTaskLater(PlayerWorldsLimiter.getINSTANCE(), () -> {
             System.out.println("Block NBT：" + NBT.get(event.getBlock().getState(), ReadableNBT::toString));
-            String type2 = ConfigManager.getBlockID(location.getBlock());
+            Block block = location.getBlock();
+            if (block.isEmpty()) return;
+            String type2 = ConfigManager.getBlockID(block);
             if (!ConfigManager.getIdMapper().containsKey(type2)) {
                 ConfigManager.getIdMapper().put(type2, type);
                 player.sendMessage(ChatColor.GREEN + "检测到方块在放下之后id为 " + ChatColor.YELLOW + type2 + ChatColor.GREEN + " 已自动添加该映射");
@@ -212,15 +216,22 @@ public class BlockListener implements Listener {
         }, 20L);
     }
 
-    public static void addBlock(Block block, boolean force) {
-        String world = block.getWorld().getName();
+    public static void addBlock(Block block, String worldName, boolean force) {
         //只对家园生效
-        if (PlayerWorldsLimiter.getOwnerUUID(world) == null) {
-            return;
-        }
         String id = ConfigManager.getBlockID(block);
         String type = ConfigManager.getIdMapper().get(id);
-        addCount(block, force, world, type);
+
+        if (type == null) return;
+        if (".*".equals(type)) {
+            Collection<ItemStack> drops = block.getDrops();
+            Iterator<ItemStack> iterator = drops.iterator();
+            if (iterator.hasNext()) {
+                ItemStack next = iterator.next();
+                type = ConfigManager.getItemID(next);
+            } else return;
+        }
+
+        addCount(block, force, worldName, type);
     }
 
     // 返回 max 达到限制 -1不限制

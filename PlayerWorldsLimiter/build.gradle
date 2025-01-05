@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'top.iseason.bukkit'
-version = '1.16'
+version = '1.17'
 
 repositories {
     mavenCentral()

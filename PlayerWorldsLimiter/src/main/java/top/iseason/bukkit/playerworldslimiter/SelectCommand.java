@@ -56,10 +56,10 @@ public class SelectCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GREEN + "已更新当前世界的黑名单方块数量");
         }
         if ("scan".equals(arg)) {
-            ConfigManager.runAsynchronously(() -> ConfigManager.scanWorld(player.getWorld(), player));
+            ConfigManager.runSync(() -> ConfigManager.scanWorld(player.getWorld(), player));
         }
         if ("scanAll".equals(arg)) {
-            ConfigManager.runAsynchronously(() -> ConfigManager.scanAll(player));
+            ConfigManager.runSync(() -> ConfigManager.scanAll(player));
         }
         return true;
     }
